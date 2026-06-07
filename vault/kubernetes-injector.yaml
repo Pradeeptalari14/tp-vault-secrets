@@ -1,0 +1,29 @@
+# Auto-inject Vault secrets into Pods using annotations
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secure-app
+  namespace: production
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: secure-app }
+  template:
+    metadata:
+      labels: { app: secure-app }
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "app-readonly-role"
+        vault.hashicorp.com/agent-inject-secret-db-creds: "secret/data/production/database"
+        # Custom template structure formatting output
+        vault.hashicorp.com/agent-inject-template-db-creds: |
+          {{ with secret "secret/data/production/database" }}
+          DB_USER="{{ .Data.data.username }}"
+          DB_PASS="{{ .Data.data.password }}"
+          {{ end }}
+    spec:
+      serviceAccountName: app-serviceaccount
+      containers:
+      - name: app
+        image: alpine:3.18
+        command: ["sh", "-c", "source /vault/secrets/db-creds && exec tail -f /dev/null"]
